@@ -43,7 +43,7 @@ resized_video = resize("/path/to/video.mp4") or Tensor
 ```
 
 ### Tile Frames
-Return a list containing a single image containing all the frames and x,y coordinates of each tiled frame , only accepts single input
+Return a list containing a single image containing all the frames and x,y coordinates of each tiled frame. only accepts single video input
 ```python
 from vaug.utils import tileframes
 tiled_frames = tileframes("path/to/video.mp4")
