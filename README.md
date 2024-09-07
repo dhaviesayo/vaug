@@ -9,13 +9,13 @@ It handles video path and video tensor batches in `B,N,C,H,W`.
 git clone https://github.com/dhaviesayo/vaug
 ```
 ### Dependency
-Please Refer to [Decord](https://github.com/dmlc/decord) on how to install the library
+Please Refer to [Decord](https://github.com/dmlc/decord) on how to install the dependency
 
 ## Usage
 
 ### Perspective
 
-Perspective changes the viewpoint of the video randomly.
+Perspective changes the viewpoint of the video randomly (the new perspective is consistent across all frames).
 ```python
 from vaug.transforms import perspective
 import decord
