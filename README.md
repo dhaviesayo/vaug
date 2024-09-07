@@ -8,7 +8,8 @@ It handles video path and video tensor batches in `B,N,C,H,W`.
 ```bash
 git clone https://github.com/dhaviesayo/vaug
 ```
-d
+### Dependency
+Please Refer to [Decord](https://github.com/dmlc/decord) on how to install the library
 
 ## Usage
 
