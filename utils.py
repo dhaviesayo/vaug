@@ -304,7 +304,7 @@ def tileframes(vid: list or torch.Tensor,  chunk = _chunk , factors=factors , he
             coor = [coor[0],coor[2],coor[1],coor[3]]    #x1,y1,x2,y2
             xy_coor.append(torch.tensor(coor) )
     '''
-    return tiles if len(tiles) ==1 else torch.stack(tiles)
+    return tiles[0] if len(tiles) ==1 else torch.stack(tiles)
 
 
             
