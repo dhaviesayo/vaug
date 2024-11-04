@@ -1,13 +1,14 @@
 import numpy as np
 from torch.nn import functional as F , Module
+from torchvision.transforms import functional as f
 import torch
 
 try:
-    from decord import VideoReader , cpu
+    from decord import VideoReader , cpu , gpu
     import decord
     decord.bridge.set_bridge('torch')
 except:
-    raise Exception("Install decord through 'pip install decord' or 'git clone --recursive https://github.com/dmlc/decord' ")
+    raise Exception("Install decord through 'git clone --recursive https://github.com/dmlc/decord' ")
 
 
 
@@ -221,69 +222,72 @@ def _chunk (vid ):
 
 
 
-def tileframes(vid: str or torch.Tensor,  chunk = _chunk , factors=factors) -> list[torch.Tensor] :  # outputs tild image and coordinated of each frame in the tiled image
-    if type(vid) == str:
-        vid = VideoReader(vid , cpu(0) , num_threads =2)
-        vid = vid.get_batch(range(0, len(vid)))
-        vid =  vid.permute(0,3,1,2)
-    elif type(vid) == torch.Tensor:
+def tileframes(vid: list or torch.Tensor,  chunk = _chunk , factors=factors , height =  256 , width = 512) -> list[torch.Tensor] :  # outputs tild image and coordinated of each frame in the tiled image
+    if isinstance(vid , list):  #lists of path
+        device = gpu(0) if torch.cuda.is_available() else cpu(0)
+        vid   =  [VideoReader(paths, device , num_threads =2) for paths in vid]
+        vid = [vid.get_batch(range(0, len(vid))).permute(0,3,1,2) for vid in vid]
+
+    elif type(vid) == torch.Tensor:   #batched tensor
          vid = vid
     else:
-        raise ValueError("Expects Video path or Video tensor TCHW ")
-    chunked = chunk(vid)
+        raise ValueError("Expects list of Video paths or batched Video tensor  as BTCHW ")
     tiles = []
-    for b in chunked:
-        ff = factors(len(b))
-        mid  = int(int(len(ff) - 1 )/ 2)
-        h_w = [ff[mid] , int(len(b) / ff[mid])]
-        w = max(h_w)
-        h = min(h_w)
-
-        b_x = torch.stack(b)  #4D
-        _b = b_x.reshape(b_x.shape[0] , b_x.shape[1] , b_x.shape[2]*b_x.shape[3])
-        interpsize = b_x.shape[0]+ 1 
-        if len(factors(len(b))) ==2 or abs(w-h) > 12:
-            while len(factors(len(b))) < 3  or  abs(w-h) > 12:                                                                      ##interpolate b by adding extra 1 frame
-                b_interp = F.interpolate(_b.permute(1,2,0) , size= interpsize, mode="nearest" )
-                new_b =  b_interp.permute(2,0,1).reshape(interpsize,b_x.shape[1],b_x.shape[2],b_x.shape[3] )
-                b = [frames  for frames in new_b]
-                ff = factors(len(b))
-                mid  = int(int(len(ff) - 1 )/ 2)
-                h_w = [ff[mid] , int(len(b) / ff[mid])]
-                w = max(h_w)
-                h = min(h_w)
-                interpsize +=1
-
-            tobeconcat = []
-            for i in range(int(h)) :
-                totile = b[:w]
-                concat = torch.cat(totile , dim=2)
-                tobeconcat.append(concat)
-                del b[:w]
-            out = torch.cat(tobeconcat ,  dim=1)
-
-        else:
-            interpsize = len(b)
+    for vid in vid:
+        chunked = chunk(vid)
+        for b in chunked:
             ff = factors(len(b))
             mid  = int(int(len(ff) - 1 )/ 2)
             h_w = [ff[mid] , int(len(b) / ff[mid])]
             w = max(h_w)
             h = min(h_w)
 
+            b_x = torch.stack(b)  #4D
+            _b = b_x.reshape(b_x.shape[0] , b_x.shape[1] , b_x.shape[2]*b_x.shape[3])
+            interpsize = b_x.shape[0]+ 1 
+            if len(factors(len(b))) ==2 or abs(w-h) > 12:
+                while len(factors(len(b))) < 3  or  abs(w-h) > 12:                                                                      ##interpolate b by adding extra 1 frame
+                    b_interp = F.interpolate(_b.permute(1,2,0) , size= interpsize, mode="nearest" )
+                    new_b =  b_interp.permute(2,0,1).reshape(interpsize,b_x.shape[1],b_x.shape[2],b_x.shape[3] )
+                    b = [frames  for frames in new_b]
+                    ff = factors(len(b))
+                    mid  = int(int(len(ff) - 1 )/ 2)
+                    h_w = [ff[mid] , int(len(b) / ff[mid])]
+                    w = max(h_w)
+                    h = min(h_w)
+                    interpsize +=1
 
-            tobeconcat = []
-            for i in range(int(h)) :
-                totile = b[:w]
-                concat = torch.cat(totile , dim=2)
-                tobeconcat.append(concat)
-                del b[:w]
-            out = torch.cat(tobeconcat ,  dim=1)
-        tiles.append(out)
-    del totile
-    del concat
-    del out
-    
-    tiles = [tiles/255 for tiles in tiles]
+                tobeconcat = []
+                for i in range(int(h)) :
+                    totile = b[:w]
+                    concat = torch.cat(totile , dim=2)
+                    tobeconcat.append(concat)
+                    del b[:w]
+                out = torch.cat(tobeconcat ,  dim=1)
+
+            else:
+                interpsize = len(b)
+                ff = factors(len(b))
+                mid  = int(int(len(ff) - 1 )/ 2)
+                h_w = [ff[mid] , int(len(b) / ff[mid])]
+                w = max(h_w)
+                h = min(h_w)
+
+
+                tobeconcat = []
+                for i in range(int(h)) :
+                    totile = b[:w]
+                    concat = torch.cat(totile , dim=2)
+                    tobeconcat.append(concat)
+                    del b[:w]
+                out = torch.cat(tobeconcat ,  dim=1)
+            tiles.append(out)
+        del totile
+        del concat
+        del out
+        
+    tiles = [f.resize(tiles/255 ,  [height , width]) for tiles in tiles]
+    '''
     num_frames_in_height = len(tobeconcat)
     num_frames_in_width  = interpsize//  num_frames_in_height
     
@@ -298,9 +302,10 @@ def tileframes(vid: str or torch.Tensor,  chunk = _chunk , factors=factors) -> l
             x_coor = w_indices[j:j+2]
             coor = x_coor + y_coor
             coor = [coor[0],coor[2],coor[1],coor[3]]    #x1,y1,x2,y2
-            xy_coor.append(coor)  
-    return [tiles[0] , xy_coor]
+            xy_coor.append(torch.tensor(coor) )
+    '''
+    return torch.stack(tiles)
 
 
+            
         
-    
