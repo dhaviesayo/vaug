@@ -223,13 +223,14 @@ def _chunk (vid ):
 
 
 def tileframes(vid: list or torch.Tensor,  chunk = _chunk , factors=factors , height =  256 , width = 512) -> list[torch.Tensor] :  # outputs tild image and coordinated of each frame in the tiled image
-    if isinstance(vid , list):  #lists of path
+    if isinstance(vid , list) and type(vid[0]) ==  str:  #lists of path
         device = gpu(0) if torch.cuda.is_available() else cpu(0)
         vid   =  [VideoReader(paths, device , num_threads =2) for paths in vid]
         vid = [vid.get_batch(range(0, len(vid))).permute(0,3,1,2) for vid in vid]
 
-    elif type(vid) == torch.Tensor:   #batched tensor
+    elif type(vid) == torch.Tensor and  vid.dim() == 5 :   #batched tensor
          vid = vid
+    
     else:
         raise ValueError("Expects list of Video paths or batched Video tensor  as BTCHW ")
     tiles = []
